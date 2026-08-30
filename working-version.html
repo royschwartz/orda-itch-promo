@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0d">
+<meta name="description" content="Orda is a two-player turn-based strategy game with an emphasis on tactics and area control.">
+<title>Orda — Working Version</title>
+<style>
+@font-face{font-family:"RobotoO";src:url("assets/RobotoO.ttf") format("truetype");font-display:swap}
+@font-face{font-family:"JBMono";src:url("assets/JBMono.ttf") format("truetype");font-display:swap}
+:root{
+  --bg:#0a0a0d;--surface:#121218;--surface-2:#17171e;
+  --head:#f1eff6;--text:#c2bfcb;--muted:#8b8898;
+  --border:#20202a;--border-2:#2b2b35;
+  --accent:#9182f2;--accent-soft:rgba(145,130,242,.14);
+  --sans:"RobotoO",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JBMono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --maxw:1060px;--col:500px;color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16.5px;line-height:1.68;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden}
+img{max-width:100%}
+a{color:inherit}
+::selection{background:var(--accent-soft);color:var(--head)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,40px)}
+.skip{position:fixed;left:12px;top:12px;z-index:50;padding:8px 12px;background:var(--accent);color:var(--bg);
+  font-family:var(--mono);font-size:13px;text-decoration:none;transform:translateY(-160%)}
+.skip:focus{transform:none}
+
+.hero{padding:clamp(56px,9vh,104px) 0 clamp(40px,7vh,72px);position:relative;text-align:center}
+.hero::before{content:"";position:absolute;inset:0 0 auto 0;height:380px;z-index:-1;pointer-events:none;
+  background:radial-gradient(46% 100% at 30% 0%,rgba(145,130,242,.08),transparent 72%)}
+.mark{margin:0;text-align:center;line-height:0}
+.mark__image{display:block;width:clamp(180px,44vw,280px);height:auto;margin:0 auto;filter:invert(1);mix-blend-mode:screen}
+.mark::after{content:"";display:block;width:40px;height:2px;background:var(--accent);margin:22px auto 0;opacity:.85;border-radius:2px}
+.intro{max-width:52ch;display:flex;flex-direction:column;gap:16px;margin:26px auto 0;text-align:left}
+.intro p{margin:0;font-size:clamp(17px,2vw,20px);line-height:1.6;color:var(--text)}
+
+/* ---- primary tab navigation ---- */
+.tabsbar{position:sticky;top:0;z-index:20;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:rgba(10,10,13,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 auto;padding:0 10px;justify-content:center}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;appearance:none;background:none;border:0;cursor:pointer;position:relative;font-family:var(--mono);
+  font-size:clamp(16px,2vw,19px);font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  padding:17px 18px 16px;white-space:nowrap;transition:color .18s}
+.tab:hover{color:var(--text)}
+.tab.is-active{color:var(--head)}
+.tab::after{content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:2px;background:var(--accent);
+  transform:scaleX(0);transition:transform .2s ease}
+.tab.is-active::after{transform:scaleX(1)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.panel{padding:clamp(30px,5vh,54px) 0 clamp(52px,9vh,96px);outline:none}
+.panel[hidden]{display:none}
+
+.section__col{max-width:var(--col);margin:0 auto;display:flex;flex-direction:column;gap:22px;position:relative;z-index:1}
+.section__col h2{font-family:var(--mono);font-weight:500;font-size:clamp(27px,4vw,36px);line-height:1.2;
+  color:var(--head);margin:0 0 4px;text-transform:uppercase}
+.section__col p{margin:0;font-size:clamp(16.5px,1.8vw,19px);line-height:1.66;color:var(--text)}
+.section__col strong{color:var(--head);font-weight:500}
+.section__col em{color:var(--head);font-style:italic}
+.section__col a{color:var(--head);text-decoration-color:var(--accent);text-underline-offset:4px}
+.section__col a:hover{color:var(--accent)}
+
+/* ---- collapsible subsections ---- */
+.acc{position:relative}
+.acc::before,.acc:last-of-type::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
+  width:min(100%,var(--col));height:1px;background:var(--border)}
+.acc::before{top:0}
+.acc:last-of-type::after{bottom:0}
+.acc>summary{display:block;cursor:pointer;list-style:none;padding:clamp(24px,4vh,34px) 0}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary::marker{content:""}
+.acc>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-6px}
+.acc__row{max-width:var(--col);margin:0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  font:inherit;font-weight:400}
+.acc__title{font-family:var(--mono);font-weight:500;font-size:clamp(32px,5.2vw,42px);line-height:1.2;
+  color:var(--head);text-transform:uppercase}
+.acc__sign{font-family:var(--mono);font-weight:500;font-size:clamp(22px,3vw,28px);line-height:1;
+  color:var(--muted);transition:color .18s}
+.acc__sign::after{content:"+"}
+.acc[open] .acc__sign::after{content:"\2013"}
+.acc>summary:hover .acc__sign{color:var(--accent)}
+.acc__body{padding-bottom:clamp(34px,6vh,60px);position:relative;overflow:hidden}
+
+.herofilm{max-width:720px;margin:clamp(30px,5vh,50px) auto 0}
+.film{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;background:#000;
+  opacity:0;transform:translateY(14px);transition:opacity .7s ease,transform .7s ease}
+.film.in{opacity:1;transform:none}
+.film video{display:block;width:100%;height:100%;object-fit:cover}
+.filmcap{font-family:var(--mono);font-weight:500;font-size:13.5px;letter-spacing:.03em;color:var(--accent);
+  margin:20px auto 0;max-width:58ch;text-align:center}
+
+.visuals{margin:clamp(34px,6vh,58px) auto 0}
+.carousel{max-width:480px;margin:0 auto;outline:none;position:relative}
+.carousel:focus-visible{outline:2px solid var(--accent);outline-offset:8px;border-radius:12px}
+.viewport{display:grid;align-items:start;touch-action:pan-y}
+.slide{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:18px;
+  opacity:0;visibility:hidden;transform:translateX(10px) scale(.995);
+  transition:opacity .32s ease,transform .32s ease;pointer-events:none}
+.slide.active{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.slide__box{position:relative;width:clamp(240px,72vw,360px);aspect-ratio:892/623;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:var(--bg)}
+.slide__box::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:url("assets/orda-screen-frame.png") center/100% 100% no-repeat}
+.slide__box .art{display:block;position:relative;z-index:1}
+.art.ink{filter:invert(1)}
+.art--art .art{width:66%;height:66%;object-fit:contain}
+.art--icon .art{width:60%;height:60%;object-fit:contain}
+.art--emblem .art{width:84%;height:84%;object-fit:contain}
+.art--fill .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slide__name{font-family:var(--mono);font-weight:500;font-size:clamp(23px,4.8vw,30px);color:var(--head);line-height:1.15;margin:0}
+.slide__desc{margin:0 auto;max-width:38ch;color:var(--text);font-size:clamp(15.5px,3.6vw,17px);line-height:1.6}
+.cbtn{position:absolute;z-index:3;top:clamp(84px,25.13vw,126px);width:38px;height:116px;padding:0;border:0;background:transparent url("assets/carousel-arrow.png") center/38px 116px no-repeat;
+  color:transparent;display:block;cursor:pointer;font-size:0;opacity:.74;transform:translateY(-50%);
+  transition:opacity .18s,filter .18s,transform .18s}
+.cbtn.prev{left:calc(50% - clamp(120px,36vw,180px) - 46px)}
+.cbtn.next{right:calc(50% - clamp(120px,36vw,180px) - 46px);transform:translateY(-50%) scaleX(-1)}
+.cbtn:hover{opacity:1;filter:drop-shadow(0 0 7px rgba(255,255,255,.12));transform:translateY(-50%) scale(1.035)}
+.cbtn.next:hover{transform:translateY(-50%) scaleX(-1) scale(1.035)}
+.cbtn:active{background-image:url("assets/carousel-arrow-pressed.png");opacity:1;filter:none}
+.cbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.carousel--material{max-width:420px}
+.carousel--material .slide__box{width:clamp(180px,56vw,240px)}
+.carousel--material .slide__box::after{display:none}
+.carousel--material .cbtn{top:clamp(63px,19.5vw,84px)}
+.carousel--material .cbtn.prev{left:calc(50% - clamp(90px,28vw,120px) - 46px)}
+.carousel--material .cbtn.next{right:calc(50% - clamp(90px,28vw,120px) - 46px)}
+.carousel--evolution{max-width:820px}
+.carousel--evolution .slide{gap:20px}
+.carousel--evolution .slide__box{width:clamp(240px,72vw,760px);aspect-ratio:892/623;background:#0d0d11}
+.carousel--evolution .slide__box .art{width:100%;height:100%;object-fit:contain}
+.carousel--evolution .slide__desc{max-width:54ch}
+.carousel--evolution .cbtn{top:clamp(84px,25.13vw,265px)}
+.carousel--evolution .cbtn.prev{left:calc(50% - clamp(120px,36vw,380px) - 25px)}
+.carousel--evolution .cbtn.next{right:calc(50% - clamp(120px,36vw,380px) - 25px)}
+.visual-note{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;margin:18px 0 0}
+.subsection{margin-top:clamp(52px,9vh,96px)}
+.subsection>.section__col h3{font-family:var(--mono);font-weight:500;font-size:clamp(24px,3.5vw,31px);line-height:1.2;
+  color:var(--head);margin:0;text-transform:uppercase}
+
+.single-player__eye{position:absolute;right:-40px;bottom:-34px;width:min(280px,36vw);opacity:.06;
+  filter:invert(1);pointer-events:none;z-index:0}
+
+/* ---- concept ---- */
+.diagram{margin:clamp(38px,7vh,68px) auto;max-width:560px;padding:0}
+.diagram img{display:block;width:100%;height:auto;filter:invert(1);mix-blend-mode:lighten}
+.diagram.missing{aspect-ratio:850/580;border:1px dashed var(--border-2);border-radius:10px;display:grid;place-items:center}
+.diagram.missing img{display:none}
+.diagram.missing::after{content:"assets/concept-diagram.png";font-family:var(--mono);font-size:12.5px;
+  letter-spacing:.05em;color:var(--muted)}
+.section__col .lede{font-family:var(--mono);font-weight:500;font-size:clamp(17px,2.4vw,21px);line-height:1.5;
+  color:var(--head);padding:4px 0 4px 20px;border-left:2px solid var(--accent)}
+.section__col .quote{margin:6px 0;padding:2px 0 2px 20px;border-left:2px solid var(--border-2);
+  font-style:italic;color:var(--head);font-size:clamp(16.5px,1.9vw,19px);line-height:1.62}
+
+.foot{border-top:1px solid var(--border);padding:28px 0 50px;text-align:center}
+.foot__mark{font-family:var(--mono);font-weight:500;font-size:22px;color:var(--head)}
+.foot a{display:block;width:max-content;margin:13px auto 0;font-family:var(--mono);font-size:12.5px;color:var(--muted);
+  text-decoration:none;border-bottom:1px solid var(--border-2)}
+.foot a:hover{color:var(--accent);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.working-version .editable{cursor:text;outline:1px dashed transparent;outline-offset:4px;transition:outline-color .18s,background .18s}
+.working-version .editable:hover{outline-color:rgba(145,130,242,.38);background:rgba(145,130,242,.04)}
+.working-version .editable:focus{outline-color:var(--accent);background:rgba(145,130,242,.07)}
+.editor-bar{position:fixed;left:50%;bottom:18px;z-index:40;display:flex;align-items:center;gap:18px;width:min(720px,calc(100% - 28px));padding:11px 13px 11px 17px;
+  transform:translateX(-50%);border:1px solid var(--border-2);border-radius:12px;background:rgba(18,18,24,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  box-shadow:0 12px 34px rgba(0,0,0,.34);font-family:var(--mono);font-size:11.5px;line-height:1.3}
+.editor-bar__copy{min-width:0;display:flex;align-items:baseline;gap:10px;flex:1}
+.editor-bar__title{font-family:var(--mono);color:var(--head);font-weight:500;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.editor-bar__status{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.editor-bar__actions{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+.editor-btn{appearance:none;border:1px solid var(--border-2);border-radius:7px;background:transparent;color:var(--text);cursor:pointer;font:inherit;font-size:11px;padding:7px 9px;white-space:nowrap}
+.editor-btn:hover{color:var(--head);border-color:var(--accent);background:var(--accent-soft)}
+.editor-btn--primary{color:var(--head);border-color:rgba(145,130,242,.55)}
+@media(max-width:600px){.editor-bar{align-items:stretch;flex-direction:column;gap:9px}.editor-bar__copy{justify-content:space-between}.editor-bar__actions{justify-content:flex-end}.editor-btn{flex:1}}
+@media(max-width:760px){body{font-size:16px}}
+@media(max-width:560px){.tab{font-size:16px;letter-spacing:.08em;padding:15px 11px 14px}.tab::after{left:11px;right:11px}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body class="working-version">
+<div class="editor-bar" role="toolbar" aria-label="Working version editor">
+  <div class="editor-bar__copy"><span class="editor-bar__title">Working version</span><span class="editor-bar__status" id="editor-status">Click any text to edit</span></div>
+  <div class="editor-bar__actions"><button class="editor-btn" id="reset-working" type="button">Restore approved</button><button class="editor-btn editor-btn--primary" id="download-working" type="button">Download copy</button></div>
+</div>
+<a class="skip" href="#panels">Skip to gameplay</a>
+
+<header class="hero"><div class="wrap">
+  <h1 class="mark"><img class="mark__image" src="assets/orda-title.png" alt="Orda"></h1>
+  <div class="intro">
+    <p>Orda is a two-player turn-based strategy game with an emphasis on tactics and area control. Players compete over varied terrain and special sites on a procedurally generated planet. The goal is to destroy the other player&rsquo;s Queen.</p>
+    <p>The game pieces are intended to register on an archetypal level while also representing unique mechanics within the ruleset.</p>
+    <p>In some ways the game is very deterministic (there is almost no RNG), but randomized starting hands and the concealment mechanic adds true uncertainty to the board. The identities of units and items are often hidden until they are used, creating a powerful uncertainty to the board and the situations that emerge.</p>
+  </div>
+</div></header>
+
+<div class="tabsbar">
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab is-active" id="tab-gameplay" role="tab" data-key="gameplay" aria-controls="panel-gameplay" aria-selected="true" tabindex="0">Gameplay</button>
+    <button class="tab" id="tab-concept" role="tab" data-key="concept" aria-controls="panel-concept" aria-selected="false" tabindex="-1">Concept</button>
+    <button class="tab" id="tab-visuals" role="tab" data-key="visuals" aria-controls="panel-visuals" aria-selected="false" tabindex="-1">Visuals</button>
+  </div>
+</div>
+
+<main id="panels">
+
+  <!-- ============================ GAMEPLAY ============================ -->
+  <section class="panel" id="panel-gameplay" data-key="gameplay" role="tabpanel" aria-labelledby="tab-gameplay" tabindex="0">
+    <div class="wrap">
+      <details class="acc" id="gameplay" open>
+        <summary><h2 class="acc__row"><span class="acc__title">Gameplay</span><span class="acc__sign" aria-hidden="true"></span></h2></summary>
+        <div class="acc__body">
+          <div class="section__col">
+            <p>In online play, Orda begins with procedural map generation, including the placement of terrain and structures. Players are then shown their starting hands, which are also randomized, and bid on starting locations.</p>
+          </div>
+          <div class="herofilm">
+            <div class="film"><video src="assets/gameplay.mp4" poster="assets/gameplay.jpg" muted loop playsinline preload="metadata" disablepictureinpicture aria-label="Orda gameplay on the small map"></video></div>
+            <p class="filmcap">Start of game on the small map</p>
+          </div>
+          <div class="section__col" style="margin-top:clamp(34px,6vh,58px)">
+            <p>From there, players deploy units around their Queen and begin securing resources and territory while trying to destroy the enemy Queen. On each turn, players spend energy to move, attack, activate abilities, and deploy new material onto the board. Supply lines are created naturally as units move outward and are vital to maintaining an effective position, which means expansion also creates vulnerabilities that have to be defended.</p>
+            <p>Energy is the main currency of the game. It is used both for unit actions and for introducing new material onto the board, and replenishes each turn according to the resources a player controls. Tactical action is therefore tied directly to territorial control.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" id="environment" open>
+        <summary><h2 class="acc__row"><span class="acc__title">Environment</span><span class="acc__sign" aria-hidden="true"></span></h2></summary>
+        <div class="acc__body">
+          <div class="section__col">
+            <p>Terrain is crucial. Forests hide units, swamps immobilize, mountains block movement and line-of-sight. Resources, cities, and special sites give particular areas of the map strategic importance and create natural points of conflict.</p>
+            <p>The environment is not simply a backdrop for combat. Terrain and structures can be modified, and interact directly with movement, visibility, supply, unit abilities, and one another. The value of a position therefore depends heavily on what is around it and what forces are present. Geography is intended to actively shape the game rather than simply contain it.</p>
+          </div>
+          <div class="visuals">
+            <div class="carousel" tabindex="0" aria-roledescription="carousel"><button class="cbtn prev" type="button" aria-label="Previous image">&lsaquo;</button><div class="viewport">
+              <div class="slide active"><div class="slide__box art--fill"><img class="art" src="assets/swamp.png" alt="Swamp" loading="lazy"></div><p class="slide__desc">Swamps slow movement.</p></div>
+              <div class="slide"><div class="slide__box art--fill"><img class="art" src="assets/forest.png" alt="Forest" loading="lazy"></div><p class="slide__desc">Forests reduce visibility.</p></div>
+              <div class="slide"><div class="slide__box art--emblem"><img class="art ink" src="assets/sky-season.png" alt="Sky Season" loading="lazy"></div><h3 class="slide__name">Sky Season</h3><p class="slide__desc">In Sky, actions are more costly.</p></div>
+              <div class="slide"><div class="slide__box art--emblem"><img class="art ink" src="assets/null-season.png" alt="Null Season" loading="lazy"></div><h3 class="slide__name">Null Season</h3><p class="slide__desc">In Null, Powers are stripped and Karma is granted.</p></div>
+            </div><button class="cbtn next" type="button" aria-label="Next image">&rsaquo;</button></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" id="material" open>
+        <summary><h2 class="acc__row"><span class="acc__title">Material</span><span class="acc__sign" aria-hidden="true"></span></h2></summary>
+        <div class="acc__body">
+          <div class="section__col">
+            <p>In online play, the units and special items available to you are drawn at random from a shared pool.</p>
+          </div>
+
+          <div class="subsection">
+            <div class="section__col">
+              <h3>Specimens</h3>
+              <p>The units are called <strong>Specimens</strong>. They share the same basic attributes, but each has unique abilities and special properties. Their usefulness is highly situational, and much of the game comes from finding combinations between particular Specimens, terrain, items, and other circumstances on the board.</p>
+            </div>
+            <div class="visuals"><div class="carousel carousel--material" tabindex="0" aria-roledescription="carousel"><button class="cbtn prev" type="button" aria-label="Previous image">&lsaquo;</button><div class="viewport">
+              <div class="slide active"><div class="slide__box art--art"><img class="art ink" src="assets/hawk.png" alt="Hawk" loading="lazy"></div><p class="slide__desc">Each Specimen has Powers which are dormant until revealed. The Hawk can fly 3 spaces.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/siren.png" alt="Siren" loading="lazy"></div><p class="slide__desc">The Siren can move a target closer.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/scorpion.png" alt="Scorpion" loading="lazy"></div><p class="slide__desc">The Scorpion may poison a hex.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/mimic.png" alt="Mimic" loading="lazy"></div><p class="slide__desc">The Mimic may copy Powers.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/grey-elder.png" alt="Grey Elder" loading="lazy"></div><p class="slide__desc">The Grey Elder is created with Karma and can pass through mountains and destroy enemies with a touch.</p></div>
+            </div><button class="cbtn next" type="button" aria-label="Next image">&rsaquo;</button></div></div>
+          </div>
+
+          <div class="subsection">
+            <div class="section__col">
+              <h3>Wonders</h3>
+              <p>The special items are called <strong>Wonders</strong>. These are short-lived but extremely powerful interventions, intended to create sudden local advantages, break stalemates, or turn losing positions into winning ones. Unlike Specimens, they are generally something you build toward and expend at a decisive moment.</p>
+            </div>
+            <div class="visuals"><div class="carousel carousel--material" tabindex="0" aria-roledescription="carousel"><button class="cbtn prev" type="button" aria-label="Previous image">&lsaquo;</button><div class="viewport">
+              <div class="slide active"><div class="slide__box art--art"><img class="art ink" src="assets/director.png" alt="Director" loading="lazy"></div><p class="slide__desc">Wonders are game altering items created with Karma. The Director allows you to move nearby enemies.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/injection.png" alt="Injection" loading="lazy"></div><p class="slide__desc">The Injection lets a Specimen act twice per turn, but eventually destroys it.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/bringer.png" alt="Bringer" loading="lazy"></div><p class="slide__desc">The Bringer teleports Specimens.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/entity.png" alt="Entity" loading="lazy"></div><p class="slide__desc">The Entity is a controllable Poison cloud.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art ink" src="assets/bomb.png" alt="Bomb" loading="lazy"></div><p class="slide__desc">The Bomb destroys everything in the target hex, including the terrain itself.</p></div>
+            </div><button class="cbtn next" type="button" aria-label="Next image">&rsaquo;</button></div></div>
+          </div>
+
+          <div class="subsection" id="structures">
+            <div class="section__col"><h3>Structures</h3></div>
+            <div class="visuals"><div class="carousel carousel--material" tabindex="0" aria-roledescription="carousel"><button class="cbtn prev" type="button" aria-label="Previous image">&lsaquo;</button><div class="viewport">
+              <div class="slide active"><div class="slide__box art--icon"><img class="art ink" src="assets/tower.png" alt="Tower" loading="lazy"></div><p class="slide__desc">Towers draw from energy sources and extend your power grid.</p></div>
+              <div class="slide"><div class="slide__box art--art"><img class="art" src="assets/sculpture.png" alt="Sculpture" loading="lazy"></div><p class="slide__desc">Sculptures regenerate the environment and make Karma during Null season.</p></div>
+              <div class="slide"><div class="slide__box art--icon"><img class="art ink" src="assets/gateway.png" alt="Gateway" loading="lazy"></div><p class="slide__desc">Ancient sites with strange properties are littered across the map. The Gateway allows travel over great distances.</p></div>
+              <div class="slide"><div class="slide__box art--icon"><img class="art ink" src="assets/pool.png" alt="Pool" loading="lazy"></div><p class="slide__desc">The Pool reveals the identities of concealed Specimens.</p></div>
+            </div><button class="cbtn next" type="button" aria-label="Next image">&rsaquo;</button></div></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="acc" id="uncertainty" open>
+        <summary><h2 class="acc__row"><span class="acc__title">Uncertainty and Surprise</span><span class="acc__sign" aria-hidden="true"></span></h2></summary>
+        <div class="acc__body"><div class="section__col">
+          <p>In some respects Orda is highly deterministic. Once an action is possible, its immediate consequences are generally predictable. Attacks do fixed damage, abilities have defined effects, and movement and terrain follow stable rules. There are very few moments where a player simply has to hope that something works.</p>
+          <p>The uncertainty comes instead from the randomized maps and material, which preclude cookie-cutter strategies and make every game different. It also comes from the way different systems and player decisions interact before a position is resolved.</p>
+          <p>Specimens and Wonders enter the board concealed. Players can see that something is there without necessarily knowing what it is or what it can do. This creates a second game layered over the visible one. Players can bluff, disguise their intentions, hold important abilities in reserve, and force opponents to account for possibilities that may or may not actually be present. Revealing a concealed piece can change the meaning of a position all at once.</p>
+          <p>From a design standpoint, a major intention was that the game should reward intuition and novelty over calculation or viewing the board in a mechanistic way. The element of uncertainty moves the balance towards unorthodox strategies. Genuinely surprising their opponent should be what both players strive for.</p>
+        </div></div>
+      </details>
+
+      <details class="acc" id="single-player" open>
+        <summary><h2 class="acc__row"><span class="acc__title">Single Player</span><span class="acc__sign" aria-hidden="true"></span></h2></summary>
+        <div class="acc__body">
+          <img class="single-player__eye" src="assets/unseen-opponent.png" alt="" aria-hidden="true">
+          <div class="section__col">
+            <p>Single player takes the form of a long campaign against an unseen opponent, with individual encounters occurring across different planets. A galaxy map can be explored freely, allowing the player to choose where to travel, when to engage the enemy, and which opportunities to pursue.</p>
+            <p>Specimens, Wonders, and other resources acquired along the way carry over between encounters. This creates a strong meta-game around plotting a course through the galaxy, building the right collection of material, and deciding when resources should be spent or conserved. Choices made on one planet can therefore shape encounters much later in the campaign.</p>
+            <p>The ultimate goal is to bring your Queen safely to the other side of the galaxy.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============================ CONCEPT ============================ -->
+  <section class="panel" id="panel-concept" data-key="concept" role="tabpanel" aria-labelledby="tab-concept" tabindex="0" hidden>
+    <div class="wrap">
+      <div class="section__col">
+        <h2>Concept</h2>
+        <p>You can probably see from the presented game elements that they have an archetypal aspect. A frame story reveals the game to have been a creation of an alien civilization. The planetary conflicts and all the suffering they entail are very real, but in actuality are merely echoes of a conflict playing out on a higher level of reality. The visible game is positioned between both of these worlds.</p>
+      </div>
+
+      <figure class="diagram">
+        <img src="assets/concept-diagram.png" alt="Diagram: the Archetypal world and the Mythic world face each other, and each sends an arrow down into the hex board, which sits between them." onerror="this.parentNode.classList.add('missing')">
+      </figure>
+
+      <div class="section__col">
+        <p>To be more specific, the Mythic world is the one the game seems to be literally alluding to. There is a planet, populated by cities and alien life, where a battle rages. Small gods or heroes walk the earth, wielding artifacts of astounding power. The planet is blown up as they battle, cities being abandoned, forests burning down. Vast alien power grids are constructed across the surface, but organic monuments are also appearing, around which a new religion seems to be growing.</p>
+        <p>The Archetypal world is one where this is viewed as metaphor. The conflict is really about the struggle to better oneself, so that one may <em>overcome</em>. When players compete, they are really pushing each other to greater levels of intuition and sensitivity. The obstacles are really self-imposed; it all goes back to the self.</p>
+        <p>I&rsquo;ll try to make this more concrete by saying game elements can be seen as correlating to psychological ones. What does the Ram (with its specific rule of pushing other pieces) represent within us? Something that compels us to go forward against all odds &mdash; bravery, stubbornness? The Ram aspect has a double nature. It might be beneficial or dangerous, so the question is how best to make use of it.</p>
+        <p>In general, I think the best approach is to evoke the archetypal in an indirect way, through art and sound and the names and descriptions of things.</p>
+        <p>For the Ram the description I am using now is:</p>
+        <p class="quote">a solid wave of crushing bone, the gallop of intractable wheels . . . as determined as a planet . . . it follows its line with the certainty of someone falling to their death</p>
+        <p>The visuals of the game are likewise pitched somewhere between the Archetypal and the Mythic. The game board is certainly abstract, the pieces too. The intention is for them to be alive, but also definitely game pieces. The player should feel the presence of the board and that they are playing a game, rather than being literally immersed in the planetary struggle. And beyond this there should be an omnipresent and creeping feeling that the game is more than it seems.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ VISUALS ============================ -->
+  <section class="panel" id="panel-visuals" data-key="visuals" role="tabpanel" aria-labelledby="tab-visuals" tabindex="0" hidden>
+    <div class="wrap">
+      <div class="section__col">
+        <h2>Visuals and Sound</h2>
+        <p>What is playable now is a 2D version consisting entirely of MS Paint-style art made by me. I came up with symbols for most of the game pieces, but the intention was always to bring in more able artists for the graphics of the final game.</p>
+        <p>The direction we have settled on is to construct most of the game components in the real world, using clay and a variety of other materials, and bring them into the game with 3D scanners. This will include the hexes, the game pieces, and even effects occurring between units. I think this approach can create a compelling and, at the very least, unique look for the game.</p>
+        <p>The final artwork is still in the concept stage, but the unit designs have begun to take shape. I was initially inspired by <a href="https://www.metmuseum.org/art/collection/search/201556" target="_blank" rel="noopener noreferrer">these ancient game pieces in the Met</a>. From there, the idea evolved into mask-like faces mounted on bone or some other long structure: pieces that can twist, bend, and hop across the board. Their faces can swivel and look in different directions, with moving mouths and other articulated parts.</p>
+        <p>Structures use simpler geometries, but they also have moving parts. Items float around the units and interact with the environment. When a unit is attacked, its armor zips into place to intercept the blow; potions are poured directly into the unit&rsquo;s open mouth.</p>
+        <p>The current idea is for the stem beneath each unit to be spine-like, with its length indicating how much life the unit has left.</p>
+      </div>
+
+      <div class="visuals">
+        <div class="carousel carousel--evolution" tabindex="0" aria-roledescription="carousel" aria-label="Evolution of the unit design">
+          <button class="cbtn prev" type="button" aria-label="Previous image">&lsaquo;</button>
+          <div class="viewport">
+            <div class="slide active"><div class="slide__box"><img class="art" src="assets/visual-first-ms-paint-stem.jpg" alt="Early MS Paint unit symbol with a red mask and winding green stem"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-ms-paint-mask.jpg" alt="MS Paint horned mask unit with segmented hanging stems" loading="lazy"></div><p class="slide__desc">The mask, moving parts, and suspended body begin to appear in the 2D designs.</p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-inspiration-game-pieces.jpg" alt="Ancient game pieces mounted on long stems" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-early-tall-face.jpg" alt="Watercolor study of a long tapered unit with a face" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-structure-forms.jpg" alt="Watercolor studies of simple geometric game-piece structures" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-silhouette-studies.jpg" alt="Rows of watercolor silhouettes exploring different unit shapes" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-concept-horned.jpg" alt="Watercolor concept for a horned articulated mask" loading="lazy"></div><p class="slide__desc">The face becomes a mechanical mask assembled from separate pieces.</p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-spined-mask-studies.jpg" alt="Three watercolor studies of a spined mask on a long stem" loading="lazy"></div><p class="slide__desc">Jaw and facial plates begin to move independently around the stem</p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-skull.jpg" alt="Watercolor skull mask concept" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-brown.jpg" alt="Brown watercolor mask with dark eyes and a blue mouth" loading="lazy"></div><p class="slide__desc">Color and material become part of each face&rsquo;s identity.</p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-helmet.jpg" alt="Layered watercolor mask with helmet and hanging ornaments" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-wood.jpg" alt="Blocky wood-like watercolor face with green eyes" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-teal.jpg" alt="Teal and black watercolor mask with carved ridges" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-mask-blue-skull.jpg" alt="Pale blue skull-like mask concept" loading="lazy"></div><p class="slide__desc">In in lieu of 3D editing of scanned objects, marionette-style adjustable mouths may be physically created</p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-queen-study.jpg" alt="Collage showing the evolution of the Queen design" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-eye-study.jpg" alt="Collage of many eye-themed mask designs" loading="lazy"></div><p class="slide__desc"></p></div>
+            <div class="slide"><div class="slide__box"><img class="art" src="assets/visual-clay-mask-prototype.jpg" alt="Hand holding a small articulated clay mask prototype" loading="lazy"></div><p class="slide__desc">A first physical prototype: separate clay parts ready to become a moving, scanned piece.</p></div>
+          </div>
+          <button class="cbtn next" type="button" aria-label="Next image">&rsaquo;</button>
+        </div>
+        <p class="visual-note">Use the arrows or left and right keys to move through the studies</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot"><div class="wrap"><span class="foot__mark">Orda</span><a href="https://github.com/royschwartz/ordaagain" target="_blank" rel="noopener noreferrer">GitHub</a></div></footer>
+
+<script>
+(function(){"use strict";
+  /* ---- working version editor ---- */
+  var editorStatus=document.getElementById('editor-status'),
+      editorKey='orda.working-version.approved-copy-2026-08-29',
+      editableSelectors=['.intro p','.acc__title','.section__col h2','.section__col h3','.section__col p','.slide__name','.slide__desc','.filmcap','.visual-note','.foot__mark'],
+      editables=[];
+  editableSelectors.forEach(function(selector){document.querySelectorAll(selector).forEach(function(el){editables.push(el)})});
+  editables.forEach(function(el,i){el.classList.add('editable');el.setAttribute('contenteditable','true');el.setAttribute('spellcheck','true');el.dataset.editKey='text-'+i});
+  var approved=editables.map(function(el){return el.innerHTML});
+  function setEditorStatus(message){if(editorStatus)editorStatus.textContent=message}
+  function storedCopy(){try{return JSON.parse(localStorage.getItem(editorKey)||'null')}catch(e){return null}}
+  function applyCopy(copy){if(!copy||!Array.isArray(copy.html))return false;copy.html.forEach(function(value,i){if(editables[i]&&typeof value==='string')editables[i].innerHTML=value});return true}
+  var saved=storedCopy();
+  if(saved&&saved.html&&applyCopy(saved))setEditorStatus('Working changes restored automatically');
+  function saveCopy(){try{localStorage.setItem(editorKey,JSON.stringify({version:editorKey,html:editables.map(function(el){return el.innerHTML})}));setEditorStatus('Saved locally as working version')}catch(e){setEditorStatus('Download a copy to save these changes')};}
+  editables.forEach(function(el){el.addEventListener('input',saveCopy)});
+  document.getElementById('reset-working').addEventListener('click',function(){if(window.confirm('Restore the last approved version and discard working changes?')){editables.forEach(function(el,i){el.innerHTML=approved[i]});saveCopy();setEditorStatus('Restored from approved version')}});
+  document.getElementById('download-working').addEventListener('click',function(){saveCopy();var clone=document.documentElement.cloneNode(true);clone.querySelectorAll('[contenteditable]').forEach(function(el){el.removeAttribute('contenteditable');el.removeAttribute('spellcheck')});clone.querySelectorAll('.editable').forEach(function(el){el.classList.remove('editable');el.removeAttribute('data-edit-key')});var blob=new Blob(['<!doctype html>\n',clone.outerHTML],{type:'text/html'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='orda-working-version.html';document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);setEditorStatus('Downloaded orda-working-version.html')});
+
+  /* ---- primary tabs ---- */
+  var tabs=[].slice.call(document.querySelectorAll('.tab')),panels={},bar=document.querySelector('.tabsbar');
+  document.querySelectorAll('.panel[data-key]').forEach(function(p){panels[p.dataset.key]=p});
+  function activate(key,focus,scroll){
+    if(!panels[key])return;
+    tabs.forEach(function(t){var on=t.dataset.key===key;t.classList.toggle('is-active',on);
+      t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;if(on&&focus)t.focus()});
+    Object.keys(panels).forEach(function(k){panels[k].hidden=k!==key});
+    if(scroll&&bar){var top=bar.getBoundingClientRect().top+window.pageYOffset;
+      if(window.pageYOffset>top)window.scrollTo({top:top,behavior:'auto'})}
+    if(history.replaceState)history.replaceState(null,'','#'+key);
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){activate(t.dataset.key,false,true)});
+    t.addEventListener('keydown',function(e){var n=tabs.length,idx=i;
+      if(e.key==='ArrowRight'||e.key==='ArrowDown'){idx=(i+1)%n;e.preventDefault();activate(tabs[idx].dataset.key,true,true)}
+      else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){idx=(i-1+n)%n;e.preventDefault();activate(tabs[idx].dataset.key,true,true)}});
+  });
+  var hash=(location.hash||'').replace('#','');
+  if(hash&&panels[hash])activate(hash,false,false);
+
+  /* ---- carousels ---- */
+  document.querySelectorAll('.carousel').forEach(function(car){
+    var slides=[].slice.call(car.querySelectorAll('.slide')),cur=0,n=slides.length,viewport=car.querySelector('.viewport');
+    if(viewport)viewport.setAttribute('aria-live','polite');
+    function show(i){cur=(i+n)%n;slides.forEach(function(s,k){var on=k===cur;s.classList.toggle('active',on);s.setAttribute('aria-hidden',on?'false':'true')})}
+    car.querySelector('.prev').addEventListener('click',function(){show(cur-1)});
+    car.querySelector('.next').addEventListener('click',function(){show(cur+1)});
+    car.addEventListener('keydown',function(e){if(e.key==='ArrowLeft'){e.preventDefault();show(cur-1)}else if(e.key==='ArrowRight'){e.preventDefault();show(cur+1)}});
+    show(0);
+  });
+
+  /* ---- inline film ---- */
+  var films=[].slice.call(document.querySelectorAll('.film')),
+      reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function playSafe(v){var p=v.play();if(p&&p.catch)p.catch(function(){})}
+  if(reduce){films.forEach(function(f){f.classList.add('in');f.querySelector('video').controls=true})}
+  else if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){entries.forEach(function(en){var v=en.target.querySelector('video');
+      if(en.isIntersecting){en.target.classList.add('in');playSafe(v)}else if(!v.paused){v.pause()}})},{threshold:.25});
+    films.forEach(function(f){io.observe(f)});
+  }else{films.forEach(function(f){f.classList.add('in');playSafe(f.querySelector('video'))})}
+})();
+</script>
+</body>
+</html>
