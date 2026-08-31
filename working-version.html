@@ -40,7 +40,7 @@ a{color:inherit}
 .intro p{margin:0;font-size:clamp(17px,2vw,20px);line-height:1.6;color:var(--text)}
 
 /* ---- primary tab navigation ---- */
-.tabsbar{position:sticky;top:0;z-index:20;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+.tabsbar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border);
   background:rgba(10,10,13,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 auto;padding:0 10px;justify-content:center}
 .tabs::-webkit-scrollbar{display:none}
@@ -136,6 +136,8 @@ a{color:inherit}
 
 .single-player__eye{position:absolute;right:-40px;bottom:-34px;width:min(280px,36vw);opacity:.06;
   filter:invert(1);pointer-events:none;z-index:0}
+.single-player-content{position:relative;overflow:hidden;padding-bottom:clamp(34px,6vh,60px)}
+.empty-panel{min-height:clamp(180px,32vh,320px)}
 
 /* ---- concept ---- */
 .diagram{margin:clamp(38px,7vh,68px) auto;max-width:560px;padding:0}
@@ -169,7 +171,7 @@ a{color:inherit}
 .editor-btn:hover{color:var(--head);border-color:var(--accent);background:var(--accent-soft)}
 .editor-btn--primary{color:var(--head);border-color:rgba(145,130,242,.55)}
 @media(max-width:600px){.editor-bar{align-items:stretch;flex-direction:column;gap:9px}.editor-bar__copy{justify-content:space-between}.editor-bar__actions{justify-content:flex-end}.editor-btn{flex:1}}
-@media(max-width:760px){body{font-size:16px}}
+@media(max-width:760px){body{font-size:16px}.tabs{justify-content:flex-start}}
 @media(max-width:560px){.tab{font-size:16px;letter-spacing:.08em;padding:15px 11px 14px}.tab::after{left:11px;right:11px}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}html{scroll-behavior:auto}}
 </style>
@@ -194,7 +196,10 @@ a{color:inherit}
   <div class="tabs" role="tablist" aria-label="Sections">
     <button class="tab is-active" id="tab-gameplay" role="tab" data-key="gameplay" aria-controls="panel-gameplay" aria-selected="true" tabindex="0">gameplay</button>
     <button class="tab" id="tab-concept" role="tab" data-key="concept" aria-controls="panel-concept" aria-selected="false" tabindex="-1">concept</button>
-    <button class="tab" id="tab-visuals" role="tab" data-key="visuals" aria-controls="panel-visuals" aria-selected="false" tabindex="-1">visuals</button>
+    <button class="tab" id="tab-art" role="tab" data-key="art" aria-controls="panel-art" aria-selected="false" tabindex="-1">art</button>
+    <button class="tab" id="tab-single-player" role="tab" data-key="single-player" aria-controls="panel-single-player" aria-selected="false" tabindex="-1">single player</button>
+    <button class="tab" id="tab-jobs" role="tab" data-key="jobs" aria-controls="panel-jobs" aria-selected="false" tabindex="-1">jobs</button>
+    <button class="tab" id="tab-demo" role="tab" data-key="demo" aria-controls="panel-demo" aria-selected="false" tabindex="-1">demo</button>
   </div>
 </div>
 
@@ -292,17 +297,6 @@ a{color:inherit}
         </div></div>
       </section>
 
-      <section class="acc" id="single-player">
-        <h2 class="acc__row"><span class="acc__title">single player</span></h2>
-        <div class="acc__body">
-          <img class="single-player__eye" src="assets/unseen-opponent.png" alt="" aria-hidden="true">
-          <div class="section__col">
-            <p>Single player takes the form of a long campaign against an unseen opponent, with individual encounters occurring across different planets. A galaxy map can be explored freely, allowing the player to choose where to travel, when to engage the enemy, and which opportunities to pursue.</p>
-            <p>Specimens, Wonders, and other resources acquired along the way carry over between encounters. This creates a strong meta-game around plotting a course through the galaxy, building the right collection of material, and deciding when resources should be spent or conserved. Choices made on one planet can therefore shape encounters much later in the campaign.</p>
-            <p>The ultimate goal is to bring your Queen safely to the other side of the galaxy.</p>
-          </div>
-        </div>
-      </section>
     </div>
   </section>
 
@@ -310,7 +304,6 @@ a{color:inherit}
   <section class="panel" id="panel-concept" data-key="concept" role="tabpanel" aria-labelledby="tab-concept" tabindex="0" hidden>
     <div class="wrap">
       <div class="section__col">
-        <h2>concept</h2>
         <p>You can probably see from the presented game elements that they have an archetypal aspect. A frame story reveals the game to have been a creation of an alien civilization. The planetary conflicts and all the suffering they entail are very real, but in actuality are merely echoes of a conflict playing out on a higher level of reality. The visible game is positioned between both of these worlds.</p>
       </div>
 
@@ -330,11 +323,10 @@ a{color:inherit}
     </div>
   </section>
 
-  <!-- ============================ VISUALS ============================ -->
-  <section class="panel" id="panel-visuals" data-key="visuals" role="tabpanel" aria-labelledby="tab-visuals" tabindex="0" hidden>
+  <!-- ============================ ART ============================ -->
+  <section class="panel" id="panel-art" data-key="art" role="tabpanel" aria-labelledby="tab-art" tabindex="0" hidden>
     <div class="wrap">
       <div class="section__col">
-        <h2>visuals and sound</h2>
         <p>What is playable now is a 2D version consisting entirely of MS Paint-style art made by me. I came up with symbols for most of the game pieces, but the intention was always to bring in more able artists for the graphics of the final game.</p>
         <p>The direction we have settled on is to construct most of the game components in the real world, using clay and a variety of other materials, and bring them into the game with 3D scanners. This will include the hexes, the game pieces, and even effects occurring between units. I think this approach can create a compelling and, at the very least, unique look for the game.</p>
         <p>The final artwork is still in the concept stage, but the unit designs have begun to take shape. I was initially inspired by <a href="https://www.metmuseum.org/art/collection/search/201556" target="_blank" rel="noopener noreferrer">these ancient game pieces in the Met</a>. From there, the idea evolved into mask-like faces mounted on bone or some other long structure: pieces that can twist, bend, and hop across the board. Their faces can swivel and look in different directions, with moving mouths and other articulated parts.</p>
@@ -371,6 +363,30 @@ a{color:inherit}
     </div>
   </section>
 
+  <!-- ============================ SINGLE PLAYER ============================ -->
+  <section class="panel" id="panel-single-player" data-key="single-player" role="tabpanel" aria-labelledby="tab-single-player" tabindex="0" hidden>
+    <div class="wrap">
+      <div class="single-player-content">
+        <img class="single-player__eye" src="assets/unseen-opponent.png" alt="" aria-hidden="true">
+        <div class="section__col">
+          <p>Single player takes the form of a long campaign against an unseen opponent, with individual encounters occurring across different planets. A galaxy map can be explored freely, allowing the player to choose where to travel, when to engage the enemy, and which opportunities to pursue.</p>
+          <p>Specimens, Wonders, and other resources acquired along the way carry over between encounters. This creates a strong meta-game around plotting a course through the galaxy, building the right collection of material, and deciding when resources should be spent or conserved. Choices made on one planet can therefore shape encounters much later in the campaign.</p>
+          <p>The ultimate goal is to bring your Queen safely to the other side of the galaxy.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ JOBS ============================ -->
+  <section class="panel" id="panel-jobs" data-key="jobs" role="tabpanel" aria-labelledby="tab-jobs" tabindex="0" hidden>
+    <div class="wrap empty-panel" aria-hidden="true"></div>
+  </section>
+
+  <!-- ============================ DEMO ============================ -->
+  <section class="panel" id="panel-demo" data-key="demo" role="tabpanel" aria-labelledby="tab-demo" tabindex="0" hidden>
+    <div class="wrap empty-panel" aria-hidden="true"></div>
+  </section>
+
 </main>
 
 <footer class="foot"><div class="wrap"><span class="foot__mark">orda</span><a href="https://github.com/royschwartz/orda-itch-promo" target="_blank" rel="noopener noreferrer">github</a></div></footer>
@@ -379,7 +395,7 @@ a{color:inherit}
 (function(){"use strict";
   /* ---- working version editor ---- */
   var editorStatus=document.getElementById('editor-status'),
-      editorKey='orda.working-version.approved-copy-2026-08-30-static-lowercase',
+      editorKey='orda.working-version.approved-copy-2026-08-31-art-single-player-jobs-demo',
       editableSelectors=['.intro p','.acc__title','.section__col h2','.section__col h3','.section__col p','.slide__name','.slide__desc','.filmcap','.visual-note','.foot__mark'],
       editables=[];
   editableSelectors.forEach(function(selector){document.querySelectorAll(selector).forEach(function(el){editables.push(el)})});
@@ -414,6 +430,7 @@ a{color:inherit}
       else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){idx=(i-1+n)%n;e.preventDefault();activate(tabs[idx].dataset.key,true,true)}});
   });
   var hash=(location.hash||'').replace('#','');
+  if(hash==='visuals')hash='art';
   if(hash&&panels[hash])activate(hash,false,false);
 
   /* ---- carousels ---- */
