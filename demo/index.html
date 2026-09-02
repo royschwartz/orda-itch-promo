@@ -179,6 +179,13 @@
       const ORDA_DIAGNOSTICS_STORAGE_KEY = "orda-browser-diagnostics-v1";
       const ORDA_DIAGNOSTICS_MAX_SESSIONS = 3;
       const ORDA_DIAGNOSTICS_MAX_ENTRIES = 2000;
+      const ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES = 500;
+      const ORDA_LIFE_TRACE_PREFIX = "[ORDA_LIFE_TRACE]";
+      const diagnosticCapturePolicy = {
+        authoritativeLifeChanges: true,
+        speculativeAiLifeChanges: false,
+        hostedMultiplayerPrivateState: false,
+      };
       const nativeConsole = {
         log: console.log.bind(console),
         warn: console.warn.bind(console),
@@ -190,9 +197,14 @@
         url: window.location.href,
         userAgent: navigator.userAgent,
         entries: [],
+        lifeChanges: [],
+        lifeChangesDropped: 0,
+        capturePolicy: diagnosticCapturePolicy,
       };
       let previousDiagnosticSessions = [];
       let diagnosticsPersistTimer = 0;
+      let nextDiagnosticEntrySequence = 1;
+      let nextLifeChangeCaptureSequence = 1;
 
       try {
         const storedDiagnostics = JSON.parse(
@@ -222,7 +234,8 @@
           window.localStorage.setItem(
             ORDA_DIAGNOSTICS_STORAGE_KEY,
             JSON.stringify({
-              version: 1,
+              version: 2,
+              capturePolicy: diagnosticCapturePolicy,
               sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
                 0,
                 ORDA_DIAGNOSTICS_MAX_SESSIONS),
@@ -237,13 +250,45 @@
         diagnosticsPersistTimer = window.setTimeout(persistOrdaDiagnostics, 250);
       }
 
+      function recordLifeChange(message, consoleEntrySequence) {
+        const prefixIndex = message.indexOf(ORDA_LIFE_TRACE_PREFIX);
+        if (prefixIndex < 0) return false;
+        const jsonStart = message.indexOf("{", prefixIndex + ORDA_LIFE_TRACE_PREFIX.length);
+        if (jsonStart < 0) return false;
+
+        try {
+          const payload = JSON.parse(message.slice(jsonStart));
+          diagnosticSession.lifeChanges.push({
+            captureSequence: nextLifeChangeCaptureSequence++,
+            browserCapturedUtc: new Date().toISOString(),
+            consoleEntrySequence,
+            ...payload,
+          });
+          if (diagnosticSession.lifeChanges.length > ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES) {
+            diagnosticSession.lifeChanges.splice(
+              0,
+              diagnosticSession.lifeChanges.length - ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES);
+            diagnosticSession.lifeChangesDropped += 1;
+          }
+          return true;
+        } catch (_) {
+          // Keep the raw console entry below if a future payload cannot be parsed.
+          return false;
+        }
+      }
+
       function recordConsoleEntry(level, args) {
+        const sequence = nextDiagnosticEntrySequence++;
+        const message = Array.from(args).map(diagnosticArgumentText).join(" ");
+        const structuredLifeChangeCaptured = recordLifeChange(message, sequence);
         diagnosticSession.entries.push({
-          sequence: diagnosticSession.entries.length + 1,
+          sequence,
           utc: new Date().toISOString(),
           performanceMs: Math.round(performance.now()),
           level,
-          message: Array.from(args).map(diagnosticArgumentText).join(" ").slice(0, 6000),
+          message: structuredLifeChangeCaptured
+            ? ORDA_LIFE_TRACE_PREFIX + " stored in session.lifeChanges"
+            : message.slice(0, 6000),
         });
         if (diagnosticSession.entries.length > ORDA_DIAGNOSTICS_MAX_ENTRIES) {
           diagnosticSession.entries.splice(
@@ -270,7 +315,8 @@
         persistOrdaDiagnostics();
         return {
           exportedAt: new Date().toISOString(),
-          version: 1,
+          version: 2,
+          capturePolicy: diagnosticCapturePolicy,
           sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
             0,
             ORDA_DIAGNOSTICS_MAX_SESSIONS),
@@ -498,12 +544,12 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/e56daf72fa77aff3756d13a51f53b915.loader.js";
+      const loaderUrl = buildUrl + "/c614c0365abfe16e1441847021a700b4.loader.js";
       const config = {
         arguments: [],
-        dataUrl: buildUrl + "/457efe2e88829f637b5ad9ab283e0b40.data.unityweb",
-        frameworkUrl: buildUrl + "/ce5e1dea026ae7c5d1c74e5789e429e4.framework.js.unityweb",
-        codeUrl: buildUrl + "/4301d7cddebbf360005fd3002765ae3d.wasm.unityweb",
+        dataUrl: buildUrl + "/cc4f7290cd95bd374aa4cf32bcf74c2e.data.unityweb",
+        frameworkUrl: buildUrl + "/7381f34a4468fff4cd67441e56ace83a.framework.js.unityweb",
+        codeUrl: buildUrl + "/3ead46c301f52081421f727703eb51ba.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
