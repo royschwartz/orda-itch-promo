@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-us" data-orda-layout="viewport-16x9-cover">
+<html lang="en-us" data-orda-layout="viewport-16x9-contain">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -73,6 +73,26 @@
         transition: width 100ms linear;
       }
 
+      #orda-start {
+        min-width: 180px;
+        padding: 12px 18px;
+        border: 1px solid #7196c5;
+        border-radius: 2px;
+        color: #edf5ff;
+        background: #101a28;
+        font: 700 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #orda-start:hover,
+      #orda-start:focus-visible {
+        color: #fff;
+        border-color: #a8cfff;
+        background: #17283d;
+      }
+
       #unity-warning {
         position: absolute;
         z-index: 2;
@@ -113,7 +133,7 @@
     </style>
   </head>
   <body>
-    <main id="orda-stage" data-orda-layout="viewport-16x9-cover">
+    <main id="orda-stage" data-orda-layout="viewport-16x9-contain">
       <canvas
         id="unity-canvas"
         width=1280
@@ -121,10 +141,11 @@
         tabindex="-1"
         aria-label="Orda Web"></canvas>
       <div id="unity-loading-bar" aria-live="polite">
-        <div>Loading Orda</div>
+        <div id="unity-loading-label">Loading Orda</div>
         <div id="unity-progress-track">
           <div id="unity-progress-bar-full"></div>
         </div>
+        <button id="orda-start" type="button" hidden>Start Orda</button>
       </div>
       <div id="unity-warning"></div>
     </main>
@@ -147,7 +168,10 @@
       const stage = document.querySelector("#orda-stage");
       const canvas = document.querySelector("#unity-canvas");
       const loadingBar = document.querySelector("#unity-loading-bar");
+      const loadingLabel = document.querySelector("#unity-loading-label");
+      const progressTrack = document.querySelector("#unity-progress-track");
       const progressBar = document.querySelector("#unity-progress-bar-full");
+      const startButton = document.querySelector("#orda-start");
       const fullscreenButton = document.querySelector("#orda-fullscreen");
       const saveDiagnosticsButton = document.querySelector("#orda-save-diagnostics");
       let ordaUnityInstance = null;
@@ -386,11 +410,11 @@
         let stageHeight;
 
         if (viewportWidth / viewportHeight >= ORDA_ASPECT) {
-          stageWidth = viewportWidth;
-          stageHeight = viewportWidth / ORDA_ASPECT;
-        } else {
           stageHeight = viewportHeight;
           stageWidth = viewportHeight * ORDA_ASPECT;
+        } else {
+          stageWidth = viewportWidth;
+          stageHeight = viewportWidth / ORDA_ASPECT;
         }
 
         stage.style.width = stageWidth + "px";
@@ -434,6 +458,28 @@
       });
       syncFullscreenButton();
 
+      function startOrdaWithSound() {
+        if (!ordaUnityInstance)
+        {
+          return;
+        }
+
+        try {
+          ordaUnityInstance.SendMessage(
+            "TitleCardStage",
+            "RetryIntroAfterBrowserAudioUnlock");
+          console.log("[ORDA_AUDIO_TRACE] browser start gesture sent to title audio");
+        } catch (error) {
+          console.warn("[ORDA_AUDIO_TRACE] title audio start message failed: " +
+            diagnosticArgumentText(error));
+        }
+
+        loadingBar.style.display = "none";
+        canvas.focus({ preventScroll: true });
+      }
+
+      startButton.addEventListener("click", startOrdaWithSound);
+
       function unityShowBanner(message, type) {
         const warningBanner = document.querySelector("#unity-warning");
         const item = document.createElement("div");
@@ -452,12 +498,12 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/e74db0158532165cb2ebb9de800d9ec7.loader.js";
+      const loaderUrl = buildUrl + "/e56daf72fa77aff3756d13a51f53b915.loader.js";
       const config = {
         arguments: [],
-        dataUrl: buildUrl + "/345e3efddd030ea9182bdee581c2e32f.data.unityweb",
+        dataUrl: buildUrl + "/457efe2e88829f637b5ad9ab283e0b40.data.unityweb",
         frameworkUrl: buildUrl + "/ce5e1dea026ae7c5d1c74e5789e429e4.framework.js.unityweb",
-        codeUrl: buildUrl + "/e0d7a3f54c74f0947bf81f9f8c553862.wasm.unityweb",
+        codeUrl: buildUrl + "/4301d7cddebbf360005fd3002765ae3d.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
@@ -473,7 +519,12 @@
           progressBar.style.width = 100 * progress + "%";
         }).then((instance) => {
           ordaUnityInstance = instance;
-          loadingBar.style.display = "none";
+          progressBar.style.width = "100%";
+          progressTrack.style.display = "none";
+          loadingLabel.textContent = "Click to begin with sound";
+          startButton.hidden = false;
+          startButton.focus({ preventScroll: true });
+          console.log("[ORDA_AUDIO_TRACE] browser audio start gate ready");
         }).catch((message) => {
           unityShowBanner(String(message), "error");
         });
