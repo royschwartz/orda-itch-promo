@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en-us" data-orda-layout="viewport-16x9-cover">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <title>Orda Web</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      body {
+        position: fixed;
+        inset: 0;
+      }
+
+      #orda-stage {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        overflow: hidden;
+        background: #231F20;
+      }
+
+      #unity-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #231F20;
+      }
+
+      #unity-loading-bar {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        color: #d9e8ff;
+        background: #000;
+        font: 600 14px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      #unity-progress-track {
+        width: min(320px, 52vw);
+        height: 5px;
+        overflow: hidden;
+        border: 1px solid #446a9a;
+        background: #07101d;
+      }
+
+      #unity-progress-bar-full {
+        width: 0;
+        height: 100%;
+        background: #6ca8ea;
+        transition: width 100ms linear;
+      }
+
+      #unity-warning {
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: none;
+        text-align: center;
+        font: 14px/1.3 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="orda-stage" data-orda-layout="viewport-16x9-cover">
+      <canvas
+        id="unity-canvas"
+        width=1280
+        height=720
+        tabindex="-1"
+        aria-label="Orda Web"></canvas>
+      <div id="unity-loading-bar" aria-live="polite">
+        <div>Loading Orda</div>
+        <div id="unity-progress-track">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"></div>
+    </main>
+
+    <script>
+      const ORDA_ASPECT = 16 / 9;
+      const stage = document.querySelector("#orda-stage");
+      const canvas = document.querySelector("#unity-canvas");
+      const loadingBar = document.querySelector("#unity-loading-bar");
+      const progressBar = document.querySelector("#unity-progress-bar-full");
+
+      function fitOrdaViewport() {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        let stageWidth;
+        let stageHeight;
+
+        if (viewportWidth / viewportHeight >= ORDA_ASPECT) {
+          stageWidth = viewportWidth;
+          stageHeight = viewportWidth / ORDA_ASPECT;
+        } else {
+          stageHeight = viewportHeight;
+          stageWidth = viewportHeight * ORDA_ASPECT;
+        }
+
+        stage.style.width = stageWidth + "px";
+        stage.style.height = stageHeight + "px";
+      }
+
+      fitOrdaViewport();
+      window.addEventListener("resize", fitOrdaViewport);
+      window.addEventListener("orientationchange", fitOrdaViewport);
+
+      function unityShowBanner(message, type) {
+        const warningBanner = document.querySelector("#unity-warning");
+        const item = document.createElement("div");
+        item.textContent = message;
+        item.style.padding = "10px";
+        item.style.background = type === "error" ? "#7b1515" : "#8a6500";
+        warningBanner.appendChild(item);
+        warningBanner.style.display = "block";
+
+        if (type !== "error") {
+          window.setTimeout(() => {
+            item.remove();
+            warningBanner.style.display = warningBanner.children.length ? "block" : "none";
+          }, 5000);
+        }
+      }
+
+      const buildUrl = "Build";
+      const loaderUrl = buildUrl + "/1ee68de63167846095d088ff9c072ba9.loader.js";
+      const config = {
+        arguments: [],
+        dataUrl: buildUrl + "/69961888dc9f2f8eceacd541a76cf9d9.data.unityweb",
+        frameworkUrl: buildUrl + "/ce5e1dea026ae7c5d1c74e5789e429e4.framework.js.unityweb",
+        codeUrl: buildUrl + "/174436a17bde2a7fcec2cf5c4f2cffb6.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Orda Web",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+      };
+
+
+      const loaderScript = document.createElement("script");
+      loaderScript.src = loaderUrl;
+      loaderScript.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBar.style.width = 100 * progress + "%";
+        }).then(() => {
+          loadingBar.style.display = "none";
+        }).catch((message) => {
+          unityShowBanner(String(message), "error");
+        });
+      };
+      loaderScript.onerror = () => {
+        unityShowBanner("The Orda loader could not be downloaded.", "error");
+      };
+      document.body.appendChild(loaderScript);
+    </script>
+  </body>
+</html>
