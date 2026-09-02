@@ -83,6 +83,27 @@
         text-align: center;
         font: 14px/1.3 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
+
+      #orda-save-diagnostics {
+        position: absolute;
+        z-index: 3;
+        right: 8px;
+        bottom: 8px;
+        padding: 5px 8px;
+        border: 1px solid #48566a;
+        border-radius: 2px;
+        color: #b9c4d3;
+        background: rgba(5, 8, 12, 0.72);
+        font: 600 10px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0.08em;
+        opacity: 0.58;
+        cursor: pointer;
+      }
+
+      #orda-save-diagnostics:hover,
+      #orda-save-diagnostics:focus-visible {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -100,6 +121,10 @@
         </div>
       </div>
       <div id="unity-warning"></div>
+      <button
+        id="orda-save-diagnostics"
+        type="button"
+        title="Download the last three browser diagnostic sessions">SAVE LOG</button>
     </main>
 
     <script>
@@ -108,6 +133,234 @@
       const canvas = document.querySelector("#unity-canvas");
       const loadingBar = document.querySelector("#unity-loading-bar");
       const progressBar = document.querySelector("#unity-progress-bar-full");
+      const saveDiagnosticsButton = document.querySelector("#orda-save-diagnostics");
+
+      const ORDA_DIAGNOSTICS_STORAGE_KEY = "orda-browser-diagnostics-v1";
+      const ORDA_DIAGNOSTICS_MAX_SESSIONS = 3;
+      const ORDA_DIAGNOSTICS_MAX_ENTRIES = 2000;
+      const nativeConsole = {
+        log: console.log.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console),
+      };
+      const diagnosticSession = {
+        id: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+        startedAt: new Date().toISOString(),
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        entries: [],
+      };
+      let previousDiagnosticSessions = [];
+      let diagnosticsPersistTimer = 0;
+
+      try {
+        const storedDiagnostics = JSON.parse(
+          window.localStorage.getItem(ORDA_DIAGNOSTICS_STORAGE_KEY) || "{}");
+        if (Array.isArray(storedDiagnostics.sessions)) {
+          previousDiagnosticSessions = storedDiagnostics.sessions.slice(
+            0,
+            ORDA_DIAGNOSTICS_MAX_SESSIONS - 1);
+        }
+      } catch (_) {
+        previousDiagnosticSessions = [];
+      }
+
+      function diagnosticArgumentText(value) {
+        if (typeof value === "string") return value;
+        if (value instanceof Error) return value.stack || value.message || String(value);
+        try {
+          return JSON.stringify(value);
+        } catch (_) {
+          return String(value);
+        }
+      }
+
+      function persistOrdaDiagnostics() {
+        diagnosticsPersistTimer = 0;
+        try {
+          window.localStorage.setItem(
+            ORDA_DIAGNOSTICS_STORAGE_KEY,
+            JSON.stringify({
+              version: 1,
+              sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
+                0,
+                ORDA_DIAGNOSTICS_MAX_SESSIONS),
+            }));
+        } catch (_) {
+          // The console remains the fallback diagnostic surface when storage is unavailable.
+        }
+      }
+
+      function scheduleDiagnosticsPersist() {
+        if (diagnosticsPersistTimer) return;
+        diagnosticsPersistTimer = window.setTimeout(persistOrdaDiagnostics, 250);
+      }
+
+      function recordConsoleEntry(level, args) {
+        diagnosticSession.entries.push({
+          sequence: diagnosticSession.entries.length + 1,
+          utc: new Date().toISOString(),
+          performanceMs: Math.round(performance.now()),
+          level,
+          message: Array.from(args).map(diagnosticArgumentText).join(" ").slice(0, 6000),
+        });
+        if (diagnosticSession.entries.length > ORDA_DIAGNOSTICS_MAX_ENTRIES) {
+          diagnosticSession.entries.splice(
+            0,
+            diagnosticSession.entries.length - ORDA_DIAGNOSTICS_MAX_ENTRIES);
+        }
+        scheduleDiagnosticsPersist();
+      }
+
+      console.log = (...args) => {
+        recordConsoleEntry("log", args);
+        nativeConsole.log(...args);
+      };
+      console.warn = (...args) => {
+        recordConsoleEntry("warning", args);
+        nativeConsole.warn(...args);
+      };
+      console.error = (...args) => {
+        recordConsoleEntry("error", args);
+        nativeConsole.error(...args);
+      };
+
+      function buildDiagnosticExport() {
+        persistOrdaDiagnostics();
+        return {
+          exportedAt: new Date().toISOString(),
+          version: 1,
+          sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
+            0,
+            ORDA_DIAGNOSTICS_MAX_SESSIONS),
+        };
+      }
+
+      window.ordaDownloadDiagnostics = function () {
+        const blob = new Blob(
+          [JSON.stringify(buildDiagnosticExport(), null, 2)],
+          { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "orda-browser-diagnostics-" +
+          new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      };
+      saveDiagnosticsButton.addEventListener("click", window.ordaDownloadDiagnostics);
+      window.addEventListener("pagehide", persistOrdaDiagnostics);
+
+      function logBrowserInput(phase, event, extra = {}, level = "log") {
+        const payload = {
+          source: "browser",
+          session: diagnosticSession.id,
+          utc: new Date().toISOString(),
+          performanceMs: Math.round(performance.now()),
+          phase,
+          pointerId: event && Number.isFinite(event.pointerId) ? event.pointerId : null,
+          pointerType: event && event.pointerType ? event.pointerType : null,
+          button: event && Number.isFinite(event.button) ? event.button : null,
+          clientX: event && Number.isFinite(event.clientX) ? Math.round(event.clientX) : null,
+          clientY: event && Number.isFinite(event.clientY) ? Math.round(event.clientY) : null,
+          ...extra,
+        };
+        console[level]("[ORDA_INPUT_TRACE] " + JSON.stringify(payload));
+      }
+
+      const activeCanvasPointers = new Map();
+      canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        activeCanvasPointers.set(event.pointerId, {
+          startedAt: performance.now(),
+          clientX: event.clientX,
+          clientY: event.clientY,
+          pointerType: event.pointerType,
+        });
+        logBrowserInput("browser_pointer_down", event, {
+          activePointerCount: activeCanvasPointers.size,
+        });
+      }, true);
+
+      window.addEventListener("pointerup", (event) => {
+        const active = activeCanvasPointers.get(event.pointerId);
+        if (!active) return;
+        activeCanvasPointers.delete(event.pointerId);
+        const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+        const releasedOverCanvas = path.includes(canvas);
+        const distance = Math.hypot(
+          event.clientX - active.clientX,
+          event.clientY - active.clientY);
+        logBrowserInput("browser_pointer_up", event, {
+          durationMs: Math.round(performance.now() - active.startedAt),
+          distancePixels: Math.round(distance),
+          releasedOverCanvas,
+          activePointerCount: activeCanvasPointers.size,
+        }, releasedOverCanvas ? "log" : "warn");
+        if (!releasedOverCanvas) {
+          unityShowBanner(
+            "INPUT INTERRUPTED: the pointer was released outside the game. Try the action again.",
+            "warning");
+        }
+      }, true);
+
+      window.addEventListener("pointercancel", (event) => {
+        const active = activeCanvasPointers.get(event.pointerId);
+        if (!active) return;
+        activeCanvasPointers.delete(event.pointerId);
+        logBrowserInput("browser_pointer_cancel", event, {
+          durationMs: Math.round(performance.now() - active.startedAt),
+          activePointerCount: activeCanvasPointers.size,
+        }, "warn");
+        unityShowBanner(
+          "INPUT INTERRUPTED: the browser cancelled the hold. Try the action again.",
+          "warning");
+      }, true);
+
+      canvas.addEventListener("lostpointercapture", (event) => {
+        if (!activeCanvasPointers.has(event.pointerId)) return;
+        logBrowserInput("browser_pointer_capture_lost", event, {}, "warn");
+      }, true);
+
+      function interruptActiveCanvasPointers(reason) {
+        if (!activeCanvasPointers.size) return;
+        const interruptedPointerIds = Array.from(activeCanvasPointers.keys());
+        activeCanvasPointers.clear();
+        logBrowserInput("browser_pointer_interrupted", null, {
+          reason,
+          interruptedPointerIds,
+        }, "warn");
+        unityShowBanner(
+          "INPUT INTERRUPTED: the game lost focus during a hold. Try the action again.",
+          "warning");
+      }
+
+      window.addEventListener("blur", () => interruptActiveCanvasPointers("window-blur"));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") {
+          interruptActiveCanvasPointers("document-hidden");
+        }
+      });
+
+      window.addEventListener("error", (event) => {
+        console.error("[ORDA_RUNTIME_TRACE] " + JSON.stringify({
+          phase: "window_error",
+          message: event.message || "unknown error",
+          filename: event.filename || "",
+          line: event.lineno || 0,
+          column: event.colno || 0,
+        }));
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        console.error("[ORDA_RUNTIME_TRACE] " + JSON.stringify({
+          phase: "unhandled_rejection",
+          reason: diagnosticArgumentText(event.reason),
+        }));
+      });
+
+      console.log("[ORDA_RUNTIME_TRACE] browser diagnostics session started id=" + diagnosticSession.id);
 
       function fitOrdaViewport() {
         const viewportWidth = window.innerWidth;
@@ -149,12 +402,12 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/1ee68de63167846095d088ff9c072ba9.loader.js";
+      const loaderUrl = buildUrl + "/e74db0158532165cb2ebb9de800d9ec7.loader.js";
       const config = {
         arguments: [],
-        dataUrl: buildUrl + "/69961888dc9f2f8eceacd541a76cf9d9.data.unityweb",
+        dataUrl: buildUrl + "/0f1378f3cabfd4ef75dda73e8c04e004.data.unityweb",
         frameworkUrl: buildUrl + "/ce5e1dea026ae7c5d1c74e5789e429e4.framework.js.unityweb",
-        codeUrl: buildUrl + "/174436a17bde2a7fcec2cf5c4f2cffb6.wasm.unityweb",
+        codeUrl: buildUrl + "/e0d7a3f54c74f0947bf81f9f8c553862.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
