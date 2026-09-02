@@ -84,11 +84,17 @@
         font: 14px/1.3 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
-      #orda-save-diagnostics {
-        position: absolute;
+      #orda-controls {
+        position: fixed;
         z-index: 3;
         right: 8px;
         bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .orda-control {
         padding: 5px 8px;
         border: 1px solid #48566a;
         border-radius: 2px;
@@ -100,8 +106,8 @@
         cursor: pointer;
       }
 
-      #orda-save-diagnostics:hover,
-      #orda-save-diagnostics:focus-visible {
+      .orda-control:hover,
+      .orda-control:focus-visible {
         opacity: 1;
       }
     </style>
@@ -121,11 +127,20 @@
         </div>
       </div>
       <div id="unity-warning"></div>
+    </main>
+    <div id="orda-controls" role="group" aria-label="Game display controls">
       <button
+        class="orda-control"
+        id="orda-fullscreen"
+        type="button"
+        aria-pressed="false"
+        title="Play Orda fullscreen">FULL SCREEN</button>
+      <button
+        class="orda-control"
         id="orda-save-diagnostics"
         type="button"
         title="Download the last three browser diagnostic sessions">SAVE LOG</button>
-    </main>
+    </div>
 
     <script>
       const ORDA_ASPECT = 16 / 9;
@@ -133,7 +148,9 @@
       const canvas = document.querySelector("#unity-canvas");
       const loadingBar = document.querySelector("#unity-loading-bar");
       const progressBar = document.querySelector("#unity-progress-bar-full");
+      const fullscreenButton = document.querySelector("#orda-fullscreen");
       const saveDiagnosticsButton = document.querySelector("#orda-save-diagnostics");
+      let ordaUnityInstance = null;
 
       const ORDA_DIAGNOSTICS_STORAGE_KEY = "orda-browser-diagnostics-v1";
       const ORDA_DIAGNOSTICS_MAX_SESSIONS = 3;
@@ -384,6 +401,39 @@
       window.addEventListener("resize", fitOrdaViewport);
       window.addEventListener("orientationchange", fitOrdaViewport);
 
+      function syncFullscreenButton() {
+        const isFullscreen = Boolean(document.fullscreenElement);
+        fullscreenButton.textContent = isFullscreen ? "EXIT FULL SCREEN" : "FULL SCREEN";
+        fullscreenButton.setAttribute("aria-pressed", String(isFullscreen));
+        fullscreenButton.title = isFullscreen ? "Exit fullscreen" : "Play Orda fullscreen";
+      }
+
+      async function toggleOrdaFullscreen() {
+        try {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+          } else if (ordaUnityInstance && typeof ordaUnityInstance.SetFullscreen === "function") {
+            ordaUnityInstance.SetFullscreen(1);
+          } else {
+            throw new Error("Fullscreen API unavailable");
+          }
+        } catch (error) {
+          console.warn("[ORDA_RUNTIME_TRACE] fullscreen request failed: " +
+            diagnosticArgumentText(error));
+          unityShowBanner("Fullscreen is not available in this browser.", "warning");
+        }
+      }
+
+      fullscreenButton.addEventListener("click", toggleOrdaFullscreen);
+      document.addEventListener("fullscreenchange", () => {
+        syncFullscreenButton();
+        fitOrdaViewport();
+        console.log("[ORDA_RUNTIME_TRACE] fullscreen=" + Boolean(document.fullscreenElement));
+      });
+      syncFullscreenButton();
+
       function unityShowBanner(message, type) {
         const warningBanner = document.querySelector("#unity-warning");
         const item = document.createElement("div");
@@ -405,7 +455,7 @@
       const loaderUrl = buildUrl + "/e74db0158532165cb2ebb9de800d9ec7.loader.js";
       const config = {
         arguments: [],
-        dataUrl: buildUrl + "/0f1378f3cabfd4ef75dda73e8c04e004.data.unityweb",
+        dataUrl: buildUrl + "/345e3efddd030ea9182bdee581c2e32f.data.unityweb",
         frameworkUrl: buildUrl + "/ce5e1dea026ae7c5d1c74e5789e429e4.framework.js.unityweb",
         codeUrl: buildUrl + "/e0d7a3f54c74f0947bf81f9f8c553862.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
@@ -421,7 +471,8 @@
       loaderScript.onload = () => {
         createUnityInstance(canvas, config, (progress) => {
           progressBar.style.width = 100 * progress + "%";
-        }).then(() => {
+        }).then((instance) => {
+          ordaUnityInstance = instance;
           loadingBar.style.display = "none";
         }).catch((message) => {
           unityShowBanner(String(message), "error");
