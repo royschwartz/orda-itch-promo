@@ -512,7 +512,7 @@ a{color:inherit}
         <p class="demo-callout">DEMO PLAYABLE BELOW</p>
       </div>
       <div class="demo-frame">
-        <iframe src="demo/index.html?v=20260902T211553Z" title="Play Orda in your browser" loading="lazy" allow="fullscreen; gamepad" allowfullscreen></iframe>
+        <iframe id="orda-demo-frame" src="demo/index.html?v=20260902T224052Z" title="Play Orda in your browser" loading="lazy" allow="fullscreen; gamepad" allowfullscreen></iframe>
       </div>
     </div>
   </section>
@@ -523,6 +523,14 @@ a{color:inherit}
 
 <script>
 (function(){"use strict";
+  /* ---- opt-in browser AI diagnostics ---- */
+  var demoFrame=document.getElementById('orda-demo-frame');
+  if(demoFrame&&new URLSearchParams(window.location.search).get('aiTrace')==='1'){
+    var demoUrl=new URL(demoFrame.getAttribute('src'),window.location.href);
+    demoUrl.searchParams.set('aiTrace','1');
+    demoFrame.src=demoUrl.href;
+  }
+
   /* ---- working version editor ---- */
   var editorStatus=document.getElementById('editor-status'),
       editorKey='orda.working-version.approved-copy-2026-08-31-download-1-layout-3',

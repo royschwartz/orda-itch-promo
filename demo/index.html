@@ -180,10 +180,20 @@
       const ORDA_DIAGNOSTICS_MAX_SESSIONS = 3;
       const ORDA_DIAGNOSTICS_MAX_ENTRIES = 2000;
       const ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES = 500;
+      // These records intentionally retain full scoring and rejection evidence,
+      // so keep a smaller rolling window than ordinary console messages.
+      const ORDA_DIAGNOSTICS_MAX_AI_DECISIONS = 50;
       const ORDA_LIFE_TRACE_PREFIX = "[ORDA_LIFE_TRACE]";
+      const ORDA_AI_DECISION_TRACE_PREFIX = "[ORDA_AI_DECISION_TRACE] ";
+      // AI traces may include hidden board knowledge. This strict browser opt-in
+      // is paired with Unity's independent WebGL + non-network runtime gate.
+      const browserAiDecisionTraceRequested =
+        new URLSearchParams(window.location.search).get("aiTrace") === "1";
       const diagnosticCapturePolicy = {
         authoritativeLifeChanges: true,
         speculativeAiLifeChanges: false,
+        aiDecisionTraceRequested: browserAiDecisionTraceRequested,
+        aiDecisionTraceScope: "local-vs-ai-only",
         hostedMultiplayerPrivateState: false,
       };
       const nativeConsole = {
@@ -199,12 +209,15 @@
         entries: [],
         lifeChanges: [],
         lifeChangesDropped: 0,
+        aiDecisions: [],
+        aiDecisionsDropped: 0,
         capturePolicy: diagnosticCapturePolicy,
       };
       let previousDiagnosticSessions = [];
       let diagnosticsPersistTimer = 0;
       let nextDiagnosticEntrySequence = 1;
       let nextLifeChangeCaptureSequence = 1;
+      let nextAiDecisionCaptureSequence = 1;
 
       try {
         const storedDiagnostics = JSON.parse(
@@ -234,7 +247,7 @@
           window.localStorage.setItem(
             ORDA_DIAGNOSTICS_STORAGE_KEY,
             JSON.stringify({
-              version: 2,
+              version: 3,
               capturePolicy: diagnosticCapturePolicy,
               sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
                 0,
@@ -277,10 +290,45 @@
         }
       }
 
+      function recordAiDecision(message, consoleEntrySequence) {
+        if (!browserAiDecisionTraceRequested ||
+            !message.startsWith(ORDA_AI_DECISION_TRACE_PREFIX)) {
+          return false;
+        }
+
+        try {
+          const payload = JSON.parse(message.slice(ORDA_AI_DECISION_TRACE_PREFIX.length));
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+            return false;
+          }
+
+          diagnosticSession.aiDecisions.push({
+            ...payload,
+            captureSequence: nextAiDecisionCaptureSequence++,
+            browserCapturedUtc: new Date().toISOString(),
+            consoleEntrySequence,
+          });
+          if (diagnosticSession.aiDecisions.length > ORDA_DIAGNOSTICS_MAX_AI_DECISIONS) {
+            const dropCount =
+              diagnosticSession.aiDecisions.length - ORDA_DIAGNOSTICS_MAX_AI_DECISIONS;
+            diagnosticSession.aiDecisions.splice(0, dropCount);
+            diagnosticSession.aiDecisionsDropped += dropCount;
+          }
+          return true;
+        } catch (_) {
+          // Keep the raw console entry below if a future payload cannot be parsed.
+          return false;
+        }
+      }
+
       function recordConsoleEntry(level, args) {
         const sequence = nextDiagnosticEntrySequence++;
         const message = Array.from(args).map(diagnosticArgumentText).join(" ");
         const structuredLifeChangeCaptured = recordLifeChange(message, sequence);
+        const structuredAiDecisionCaptured = recordAiDecision(message, sequence);
+        const unrequestedAiDecision =
+          !browserAiDecisionTraceRequested &&
+          message.startsWith(ORDA_AI_DECISION_TRACE_PREFIX);
         diagnosticSession.entries.push({
           sequence,
           utc: new Date().toISOString(),
@@ -288,7 +336,11 @@
           level,
           message: structuredLifeChangeCaptured
             ? ORDA_LIFE_TRACE_PREFIX + " stored in session.lifeChanges"
-            : message.slice(0, 6000),
+            : structuredAiDecisionCaptured
+              ? ORDA_AI_DECISION_TRACE_PREFIX + "stored in session.aiDecisions"
+              : unrequestedAiDecision
+                ? ORDA_AI_DECISION_TRACE_PREFIX + "ignored; aiTrace opt-in is disabled"
+                : message.slice(0, 6000),
         });
         if (diagnosticSession.entries.length > ORDA_DIAGNOSTICS_MAX_ENTRIES) {
           diagnosticSession.entries.splice(
@@ -315,7 +367,7 @@
         persistOrdaDiagnostics();
         return {
           exportedAt: new Date().toISOString(),
-          version: 2,
+          version: 3,
           capturePolicy: diagnosticCapturePolicy,
           sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
             0,
@@ -447,7 +499,11 @@
         }));
       });
 
-      console.log("[ORDA_RUNTIME_TRACE] browser diagnostics session started id=" + diagnosticSession.id);
+      console.log(
+        "[ORDA_RUNTIME_TRACE] browser diagnostics session started id=" +
+        diagnosticSession.id +
+        " aiDecisionTraceRequested=" + browserAiDecisionTraceRequested +
+        " aiDecisionTraceScope=local-vs-ai-only");
 
       function fitOrdaViewport() {
         const viewportWidth = window.innerWidth;
@@ -544,12 +600,14 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/c614c0365abfe16e1441847021a700b4.loader.js";
+      const loaderUrl = buildUrl + "/0e9cfb3eacabcaf64bcb0118cef9e3df.loader.js";
       const config = {
-        arguments: [],
-        dataUrl: buildUrl + "/cc4f7290cd95bd374aa4cf32bcf74c2e.data.unityweb",
-        frameworkUrl: buildUrl + "/7381f34a4468fff4cd67441e56ace83a.framework.js.unityweb",
-        codeUrl: buildUrl + "/3ead46c301f52081421f727703eb51ba.wasm.unityweb",
+        arguments: browserAiDecisionTraceRequested
+          ? ["--orda-browser-ai-trace"]
+          : [],
+        dataUrl: buildUrl + "/1426c65694a6ba59740f0ae6b464beef.data.unityweb",
+        frameworkUrl: buildUrl + "/7cc4b7d54cc8bdfe190bfcf36159e4dc.framework.js.unityweb",
+        codeUrl: buildUrl + "/1a4d82812a7c0ed4843fb708e13dcb9d.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
