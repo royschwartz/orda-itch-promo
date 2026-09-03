@@ -494,7 +494,7 @@ a{color:inherit}
         <p class="demo-callout">DEMO PLAYABLE BELOW</p>
       </div>
       <div class="demo-frame">
-        <iframe id="orda-demo-frame" src="demo/index.html?v=20260902T224052Z" title="Play Orda in your browser" loading="lazy" allow="fullscreen; gamepad" allowfullscreen></iframe>
+        <iframe id="orda-demo-frame" src="demo/index.html?v=20260902T224052Z&amp;aiTrace=1" title="Play Orda in your browser" loading="lazy" allow="fullscreen; gamepad" allowfullscreen></iframe>
       </div>
     </div>
   </section>
@@ -505,12 +505,16 @@ a{color:inherit}
 
 <script>
 (function(){"use strict";
-  /* ---- opt-in browser AI diagnostics ---- */
+  /* ---- default-on browser AI diagnostics; ?aiTrace=0 opts out ---- */
   var demoFrame=document.getElementById('orda-demo-frame');
-  if(demoFrame&&new URLSearchParams(window.location.search).get('aiTrace')==='1'){
+  if(demoFrame){
+    var requestedAiTrace=new URLSearchParams(window.location.search).get('aiTrace'),
+        effectiveAiTrace=requestedAiTrace==='0'?'0':'1';
     var demoUrl=new URL(demoFrame.getAttribute('src'),window.location.href);
-    demoUrl.searchParams.set('aiTrace','1');
-    demoFrame.src=demoUrl.href;
+    if(demoUrl.searchParams.get('aiTrace')!==effectiveAiTrace){
+      demoUrl.searchParams.set('aiTrace',effectiveAiTrace);
+      demoFrame.src=demoUrl.href;
+    }
   }
 
   /* ---- primary tabs ---- */
