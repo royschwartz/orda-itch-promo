@@ -181,15 +181,22 @@
       const ORDA_DIAGNOSTICS_MAX_ENTRIES = 2000;
       const ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES = 500;
       // These records intentionally retain full scoring and rejection evidence,
-      // so keep a smaller rolling window than ordinary console messages.
-      const ORDA_DIAGNOSTICS_MAX_AI_DECISIONS = 50;
+      // so keep only the latest AI turns to stay within browser storage quotas.
+      const ORDA_DIAGNOSTICS_MAX_AI_DECISIONS = 12;
       const ORDA_LIFE_TRACE_PREFIX = "[ORDA_LIFE_TRACE]";
       const ORDA_AI_DECISION_TRACE_PREFIX = "[ORDA_AI_DECISION_TRACE] ";
-      // AI traces may include hidden board knowledge. This strict browser opt-in
-      // is paired with Unity's independent WebGL + non-network runtime gate.
-      const browserAiDecisionTraceRequested =
-        new URLSearchParams(window.location.search).get("aiTrace") === "1";
+      const generalLogsParameter =
+        new URLSearchParams(window.location.search).get("generalLogs");
+      const browserGeneralLogsRequested = generalLogsParameter !== "0";
+      // AI traces may include hidden board knowledge. They are enabled by default
+      // for local-vs-AI diagnosis, with ?aiTrace=0 as an explicit opt-out. Unity's
+      // independent WebGL + non-network runtime gate still blocks hosted matches.
+      const aiTraceParameter =
+        new URLSearchParams(window.location.search).get("aiTrace");
+      const browserAiDecisionTraceRequested = aiTraceParameter !== "0";
       const diagnosticCapturePolicy = {
+        generalConsoleEntries: true,
+        generalUnityInfoLogsRequested: browserGeneralLogsRequested,
         authoritativeLifeChanges: true,
         speculativeAiLifeChanges: false,
         aiDecisionTraceRequested: browserAiDecisionTraceRequested,
@@ -207,6 +214,7 @@
         url: window.location.href,
         userAgent: navigator.userAgent,
         entries: [],
+        entriesDropped: 0,
         lifeChanges: [],
         lifeChangesDropped: 0,
         aiDecisions: [],
@@ -339,13 +347,16 @@
             : structuredAiDecisionCaptured
               ? ORDA_AI_DECISION_TRACE_PREFIX + "stored in session.aiDecisions"
               : unrequestedAiDecision
-                ? ORDA_AI_DECISION_TRACE_PREFIX + "ignored; aiTrace opt-in is disabled"
+                ? ORDA_AI_DECISION_TRACE_PREFIX + "ignored; aiTrace=0 disabled capture"
                 : message.slice(0, 6000),
         });
         if (diagnosticSession.entries.length > ORDA_DIAGNOSTICS_MAX_ENTRIES) {
+          const dropCount =
+            diagnosticSession.entries.length - ORDA_DIAGNOSTICS_MAX_ENTRIES;
           diagnosticSession.entries.splice(
             0,
-            diagnosticSession.entries.length - ORDA_DIAGNOSTICS_MAX_ENTRIES);
+            dropCount);
+          diagnosticSession.entriesDropped += dropCount;
         }
         scheduleDiagnosticsPersist();
       }
@@ -502,6 +513,7 @@
       console.log(
         "[ORDA_RUNTIME_TRACE] browser diagnostics session started id=" +
         diagnosticSession.id +
+        " generalUnityInfoLogsRequested=" + browserGeneralLogsRequested +
         " aiDecisionTraceRequested=" + browserAiDecisionTraceRequested +
         " aiDecisionTraceScope=local-vs-ai-only");
 
@@ -600,14 +612,19 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/0e9cfb3eacabcaf64bcb0118cef9e3df.loader.js";
+      const loaderUrl = buildUrl + "/8e59d362e6ab798b980fd35cd96da6d1.loader.js";
+      const unityArguments = [];
+      if (browserGeneralLogsRequested) {
+        unityArguments.push("--orda-browser-general-logs");
+      }
+      if (browserAiDecisionTraceRequested) {
+        unityArguments.push("--orda-browser-ai-trace");
+      }
       const config = {
-        arguments: browserAiDecisionTraceRequested
-          ? ["--orda-browser-ai-trace"]
-          : [],
-        dataUrl: buildUrl + "/1426c65694a6ba59740f0ae6b464beef.data.unityweb",
+        arguments: unityArguments,
+        dataUrl: buildUrl + "/4d5fdfe9b9c5a5949b041b0e70db18e3.data.unityweb",
         frameworkUrl: buildUrl + "/7cc4b7d54cc8bdfe190bfcf36159e4dc.framework.js.unityweb",
-        codeUrl: buildUrl + "/1a4d82812a7c0ed4843fb708e13dcb9d.wasm.unityweb",
+        codeUrl: buildUrl + "/bd1a7a4bb189f78894c1b0a2e6be4edb.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
