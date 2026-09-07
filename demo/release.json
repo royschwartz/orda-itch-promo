@@ -1,0 +1,15 @@
+{
+  "build": "20260907-ai-test-web-194115",
+  "ai": "AI 1.0 Hard",
+  "actionIntervalSeconds": 2,
+  "searchBudgetMilliseconds": 1900,
+  "extraAiEnergy": 0,
+  "multiplayerEpoch": 9,
+  "files": {
+    "index.html": "063d8e270277190cc046989bc0bdc454982d1964093a1b8fb991f01fa47e4560",
+    "Build/c17f999b94bec317662ae4c469ac9d40.data.unityweb": "dc91bbfb013bea169972d5cb8de04d9e5ceb3c141abad5bb8323fb2f04122ee8",
+    "Build/85e7b65d4e60e203e3a6de37b221f775.framework.js.unityweb": "b2f4adf44fc005813462e1442d040e3ab0d8b8fc02c72271851df6efe11523bd",
+    "Build/221e4bbc74effbc97e31ea58426afeea.loader.js": "87769b7d9f98a25aec7036d3a0f6e7015856fb7283209c2db7365d9e719cee2b",
+    "Build/4e7017bec5116cf4bc5c6b71a701cee3.wasm.unityweb": "1230985b24377065784ab9ad2a99f988bf390a07c0fb9d7f4d71101d5f977687"
+  }
+}

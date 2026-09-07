@@ -612,8 +612,9 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/8e59d362e6ab798b980fd35cd96da6d1.loader.js";
-      const unityArguments = [];
+      const loaderUrl = buildUrl + "/221e4bbc74effbc97e31ea58426afeea.loader.js";
+      // Use the same native AI 1.0 preset as Rebuild and Play Latest Orda.
+      const unityArguments = ["--orda-ai-test-settings", "--orda-ai-difficulty", "hard"];
       if (browserGeneralLogsRequested) {
         unityArguments.push("--orda-browser-general-logs");
       }
@@ -622,9 +623,9 @@
       }
       const config = {
         arguments: unityArguments,
-        dataUrl: buildUrl + "/4d5fdfe9b9c5a5949b041b0e70db18e3.data.unityweb",
-        frameworkUrl: buildUrl + "/7cc4b7d54cc8bdfe190bfcf36159e4dc.framework.js.unityweb",
-        codeUrl: buildUrl + "/bd1a7a4bb189f78894c1b0a2e6be4edb.wasm.unityweb",
+        dataUrl: buildUrl + "/c17f999b94bec317662ae4c469ac9d40.data.unityweb",
+        frameworkUrl: buildUrl + "/85e7b65d4e60e203e3a6de37b221f775.framework.js.unityweb",
+        codeUrl: buildUrl + "/4e7017bec5116cf4bc5c6b71a701cee3.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
