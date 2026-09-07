@@ -163,6 +163,7 @@
         title="Download the last three browser diagnostic sessions">SAVE LOG</button>
     </div>
 
+    <script src="OrdaDiagnosticArchive.js"></script>
     <script>
       const ORDA_ASPECT = 16 / 9;
       const stage = document.querySelector("#orda-stage");
@@ -178,11 +179,7 @@
 
       const ORDA_DIAGNOSTICS_STORAGE_KEY = "orda-browser-diagnostics-v1";
       const ORDA_DIAGNOSTICS_MAX_SESSIONS = 3;
-      const ORDA_DIAGNOSTICS_MAX_ENTRIES = 2000;
-      const ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES = 500;
-      // These records intentionally retain full scoring and rejection evidence,
-      // so keep only the latest AI turns to stay within browser storage quotas.
-      const ORDA_DIAGNOSTICS_MAX_AI_DECISIONS = 12;
+      // Keep complete sessions; IndexedDB stores new records in incremental chunks.
       const ORDA_LIFE_TRACE_PREFIX = "[ORDA_LIFE_TRACE]";
       const ORDA_AI_DECISION_TRACE_PREFIX = "[ORDA_AI_DECISION_TRACE] ";
       const generalLogsParameter =
@@ -198,6 +195,10 @@
         generalConsoleEntries: true,
         generalUnityInfoLogsRequested: browserGeneralLogsRequested,
         authoritativeLifeChanges: true,
+        multiplayerLifeChanges: "local-player-units",
+        movementHealthSnapshots: true,
+        retention: "three-full-sessions",
+        messageTruncation: false,
         speculativeAiLifeChanges: false,
         aiDecisionTraceRequested: browserAiDecisionTraceRequested,
         aiDecisionTraceScope: "local-vs-ai-only",
@@ -249,26 +250,33 @@
         }
       }
 
-      function persistOrdaDiagnostics() {
+      const diagnosticArchive = new OrdaDiagnosticArchive();
+      const diagnosticArchiveReady = diagnosticArchive.loadRecent().then(async sessions => {
+        if (sessions.length) {
+          previousDiagnosticSessions = sessions.filter(session => session.id !== diagnosticSession.id);
+        } else {
+          // Migrate the available legacy sessions once; already-dropped messages cannot be recovered.
+          for (const session of [...previousDiagnosticSessions].reverse()) await diagnosticArchive.save(session);
+        }
+      }).catch(error => {
+        diagnosticSession.storageError = String(error);
+      });
+
+      async function persistOrdaDiagnostics() {
         diagnosticsPersistTimer = 0;
+        await diagnosticArchiveReady;
         try {
-          window.localStorage.setItem(
-            ORDA_DIAGNOSTICS_STORAGE_KEY,
-            JSON.stringify({
-              version: 3,
-              capturePolicy: diagnosticCapturePolicy,
-              sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
-                0,
-                ORDA_DIAGNOSTICS_MAX_SESSIONS),
-            }));
-        } catch (_) {
-          // The console remains the fallback diagnostic surface when storage is unavailable.
+          await diagnosticArchive.save(diagnosticSession);
+          delete diagnosticSession.storageError;
+        } catch (error) {
+          // The full current session remains in memory and in SAVE LOG, even on quota failure.
+          diagnosticSession.storageError = String(error);
         }
       }
 
       function scheduleDiagnosticsPersist() {
         if (diagnosticsPersistTimer) return;
-        diagnosticsPersistTimer = window.setTimeout(persistOrdaDiagnostics, 250);
+        diagnosticsPersistTimer = window.setTimeout(persistOrdaDiagnostics, 1000);
       }
 
       function recordLifeChange(message, consoleEntrySequence) {
@@ -285,12 +293,6 @@
             consoleEntrySequence,
             ...payload,
           });
-          if (diagnosticSession.lifeChanges.length > ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES) {
-            diagnosticSession.lifeChanges.splice(
-              0,
-              diagnosticSession.lifeChanges.length - ORDA_DIAGNOSTICS_MAX_LIFE_CHANGES);
-            diagnosticSession.lifeChangesDropped += 1;
-          }
           return true;
         } catch (_) {
           // Keep the raw console entry below if a future payload cannot be parsed.
@@ -316,12 +318,6 @@
             browserCapturedUtc: new Date().toISOString(),
             consoleEntrySequence,
           });
-          if (diagnosticSession.aiDecisions.length > ORDA_DIAGNOSTICS_MAX_AI_DECISIONS) {
-            const dropCount =
-              diagnosticSession.aiDecisions.length - ORDA_DIAGNOSTICS_MAX_AI_DECISIONS;
-            diagnosticSession.aiDecisions.splice(0, dropCount);
-            diagnosticSession.aiDecisionsDropped += dropCount;
-          }
           return true;
         } catch (_) {
           // Keep the raw console entry below if a future payload cannot be parsed.
@@ -348,16 +344,8 @@
               ? ORDA_AI_DECISION_TRACE_PREFIX + "stored in session.aiDecisions"
               : unrequestedAiDecision
                 ? ORDA_AI_DECISION_TRACE_PREFIX + "ignored; aiTrace=0 disabled capture"
-                : message.slice(0, 6000),
+                : message,
         });
-        if (diagnosticSession.entries.length > ORDA_DIAGNOSTICS_MAX_ENTRIES) {
-          const dropCount =
-            diagnosticSession.entries.length - ORDA_DIAGNOSTICS_MAX_ENTRIES;
-          diagnosticSession.entries.splice(
-            0,
-            dropCount);
-          diagnosticSession.entriesDropped += dropCount;
-        }
         scheduleDiagnosticsPersist();
       }
 
@@ -374,11 +362,15 @@
         nativeConsole.error(...args);
       };
 
-      function buildDiagnosticExport() {
-        persistOrdaDiagnostics();
+      async function buildDiagnosticExport() {
+        await persistOrdaDiagnostics();
+        try {
+          previousDiagnosticSessions = (await diagnosticArchive.loadRecent())
+            .filter(session => session.id !== diagnosticSession.id);
+        } catch (_) { /* Preserve the available legacy sessions on storage failure. */ }
         return {
           exportedAt: new Date().toISOString(),
-          version: 3,
+          version: 4,
           capturePolicy: diagnosticCapturePolicy,
           sessions: [diagnosticSession, ...previousDiagnosticSessions].slice(
             0,
@@ -386,9 +378,9 @@
         };
       }
 
-      window.ordaDownloadDiagnostics = function () {
+      window.ordaDownloadDiagnostics = async function () {
         const blob = new Blob(
-          [JSON.stringify(buildDiagnosticExport(), null, 2)],
+          [JSON.stringify(await buildDiagnosticExport(), null, 2)],
           { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -402,6 +394,9 @@
       };
       saveDiagnosticsButton.addEventListener("click", window.ordaDownloadDiagnostics);
       window.addEventListener("pagehide", persistOrdaDiagnostics);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") persistOrdaDiagnostics();
+      });
 
       function logBrowserInput(phase, event, extra = {}, level = "log") {
         const payload = {
@@ -612,7 +607,7 @@
       }
 
       const buildUrl = "Build";
-      const loaderUrl = buildUrl + "/221e4bbc74effbc97e31ea58426afeea.loader.js";
+      const loaderUrl = buildUrl + "/f87c1107771cc214be27dd395a021f9d.loader.js";
       // Use the same native AI 1.0 preset as Rebuild and Play Latest Orda.
       const unityArguments = ["--orda-ai-test-settings", "--orda-ai-difficulty", "hard"];
       if (browserGeneralLogsRequested) {
@@ -623,9 +618,9 @@
       }
       const config = {
         arguments: unityArguments,
-        dataUrl: buildUrl + "/c17f999b94bec317662ae4c469ac9d40.data.unityweb",
+        dataUrl: buildUrl + "/3eb2d7ba33c991930f394ce8d69f653c.data.unityweb",
         frameworkUrl: buildUrl + "/85e7b65d4e60e203e3a6de37b221f775.framework.js.unityweb",
-        codeUrl: buildUrl + "/4e7017bec5116cf4bc5c6b71a701cee3.wasm.unityweb",
+        codeUrl: buildUrl + "/cb83099f101d9f5a822cd2d31a4c37e7.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Orda Web",
